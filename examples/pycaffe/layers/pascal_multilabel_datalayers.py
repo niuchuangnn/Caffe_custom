@@ -92,6 +92,7 @@ class BatchLoader(object):
         self.batch_size = params['batch_size']
         self.pascal_root = params['pascal_root']
         self.im_shape = params['im_shape']
+        self.im_mean = params['im_mean']
         # get list of image indexes.
         list_file = params['split'] + '.txt'
         self.indexlist = [line.rstrip('\n') for line in open(
@@ -99,6 +100,7 @@ class BatchLoader(object):
         self._cur = 0  # current image
         # this class does some simple data-manipulations
         self.transformer = SimpleTransformer()
+        self.transformer.set_mean(self.im_mean)
 
         print "BatchLoader initialized with {} images".format(
             len(self.indexlist))

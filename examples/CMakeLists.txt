@@ -8,7 +8,7 @@ foreach(source_file ${examples_srcs})
   get_filename_component(path ${source_file} PATH)
   get_filename_component(folder ${path} NAME_WE)
     
-  add_executable(${name} ${source_file})
+  add_executable(${name} ${source_file} ../include/caffe/layers/weightedSoftmax_loss_layer.hpp ../include/caffe/layers/pooling_switches_layer.hpp ../include/caffe/layers/slice_half_layer.hpp ../include/caffe/layers/inv_pooling_layer.hpp ../include/caffe/layers/superpixel_pooling_layer.hpp ../include/caffe/layers/unpooling_layer.hpp ../include/caffe/layers/superpixel_pooling1_layer.hpp ../include/caffe/layers/relu_mask_layer.hpp ../include/caffe/layers/select_seg_binary_layer.hpp ../include/caffe/layers/image_dim_prefetching_layer.hpp ../include/caffe/layers/bn_layer.hpp ../include/caffe/layers/conv_td_layer.hpp ../include/caffe/layers/inner_product_td_layer.hpp ../include/caffe/layers/pooling_td_layer.hpp ../include/caffe/layers/eltwise_td_layer.hpp)
   target_link_libraries(${name} ${Caffe_LINK})
   caffe_default_properties(${name})
 

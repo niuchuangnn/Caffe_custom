@@ -66,7 +66,8 @@ def coord_map(fn):
     if fn.type_name in ['Convolution', 'Pooling', 'Im2col']:
         axis, stride, ks, pad = conv_params(fn)
         return axis, 1 / stride, (pad - (ks - 1) / 2) / stride
-    elif fn.type_name == 'Deconvolution':
+    # elif fn.type_name == 'Deconvolution':
+    elif fn.type_name in ['Deconvolution', 'Unpooling']:
         axis, stride, ks, pad = conv_params(fn)
         return axis, stride, (ks - 1) / 2 - pad
     elif fn.type_name in PASS_THROUGH_LAYERS:
@@ -111,6 +112,49 @@ def inverse(coord_map):
     ax, a, b = coord_map
     return ax, 1 / a, -b / a
 
+def coord_map_bottom_up(top_up, top_bottom, is_forward=False):
+    """
+    Determine the coordinate mapping betweeen a top (bottom) and a top (up).
+    is_forward: from 
+    scale: 
+    """
+    # We need to find a common ancestor of top_from and top_to.
+    # We'll assume that all ancestors are equivalent here (otherwise the graph
+    # is an inconsistent state (which we could improve this to check for)).
+    # For now use a brute-force algorithm.
+
+    def collect_bottoms(top):
+        """
+        Collect the bottoms to walk for the coordinate mapping.
+        The general rule is that all the bottoms of a layer can be mapped, as
+        most layers have the same coordinate mapping for each bottom.
+        Crop layer is a notable exception. Only the first/cropped bottom is
+        mappable; the second/dimensions bottom is excluded from the walk.
+        """
+        bottoms = top.fn.inputs
+        if top.fn.type_name == 'Crop':
+            bottoms = bottoms[:1]
+        return bottoms
+
+    # walk back from top_from, keeping the coord map as we go
+    from_maps = {top_up: (None, 1, 0)}
+    frontier = {top_up}
+    while frontier:
+        top = frontier.pop()
+        try:
+            bottoms = collect_bottoms(top)
+            for bottom in bottoms:
+                if bottom is top_bottom:
+                    from_maps[bottom] = from_maps[top]
+                    break
+                from_maps[bottom] = compose(from_maps[top], coord_map(top.fn))
+                frontier.add(bottom)
+        except UndefinedMapException:
+            pass
+    if not is_forward:
+        return inverse(from_maps[top_bottom])
+    else:
+        return from_maps[top_bottom]
 
 def coord_map_from_to(top_from, top_to):
     """

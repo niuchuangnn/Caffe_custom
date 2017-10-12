@@ -363,10 +363,12 @@ message LayerParameter {
   optional AccuracyParameter accuracy_param = 102;
   optional ArgMaxParameter argmax_param = 103;
   optional BatchNormParameter batch_norm_param = 139;
+  optional BNParameter bn_param = 155;
   optional BiasParameter bias_param = 141;
   optional ConcatParameter concat_param = 104;
   optional ContrastiveLossParameter contrastive_loss_param = 105;
   optional ConvolutionParameter convolution_param = 106;
+  optional ConvolutionTDParameter convolution_td_param = 156;
   optional CropParameter crop_param = 144;
   optional DataParameter data_param = 107;
   optional DropoutParameter dropout_param = 108;
@@ -380,8 +382,10 @@ message LayerParameter {
   optional HDF5OutputParameter hdf5_output_param = 113;
   optional HingeLossParameter hinge_loss_param = 114;
   optional ImageDataParameter image_data_param = 115;
+  optional SelectSegBinaryParameter select_seg_binary_param = 154;
   optional InfogainLossParameter infogain_loss_param = 116;
   optional InnerProductParameter inner_product_param = 117;
+  optional InnerProductTDParameter inner_product_td_param = 157;
   optional InputParameter input_param = 143;
   optional LogParameter log_param = 134;
   optional LRNParameter lrn_param = 118;
@@ -389,12 +393,16 @@ message LayerParameter {
   optional MVNParameter mvn_param = 120;
   optional ParameterParameter parameter_param = 145;
   optional PoolingParameter pooling_param = 121;
+  optional SuperpixelPoolingParameter superpixel_pooling_param = 150;
+  optional SuperpixelPooling1Parameter superpixel_pooling1_param = 152;
+  optional UnpoolingParameter unpooling_param = 151;
   optional PowerParameter power_param = 122;
   optional PReLUParameter prelu_param = 131;
   optional PythonParameter python_param = 130;
   optional RecurrentParameter recurrent_param = 146;
   optional ReductionParameter reduction_param = 136;
   optional ReLUParameter relu_param = 123;
+  optional ReLUMaskParameter relu_mask_param = 153;
   optional ReshapeParameter reshape_param = 133;
   optional ScaleParameter scale_param = 142;
   optional SigmoidParameter sigmoid_param = 124;
@@ -501,6 +509,17 @@ message ConcatParameter {
   optional uint32 concat_dim = 1 [default = 1];
 }
 
+// Message that stores parameters used by BN (Batch Normalization)  layer
+message BNParameter {
+  enum BNMode {
+    LEARN = 0;
+    INFERENCE = 1;
+  }
+  optional BNMode bn_mode = 3 [default = LEARN];
+  optional FillerParameter scale_filler = 1;  // The filler for the scale
+  optional FillerParameter shift_filler = 2;  // The filler for the shift
+}
+
 message BatchNormParameter {
   // If false, normalization is performed over the current mini-batch
   // and global statistics are accumulated (but not yet used) by a moving
@@ -568,6 +587,60 @@ message ContrastiveLossParameter {
 }
 
 message ConvolutionParameter {
+  optional uint32 num_output = 1; // The number of outputs for the layer
+  optional bool bias_term = 2 [default = true]; // whether to have bias terms
+
+  // Pad, kernel size, and stride are all given as a single value for equal
+  // dimensions in all spatial dimensions, or once per spatial dimension.
+  repeated uint32 pad = 3; // The padding size; defaults to 0
+  repeated uint32 kernel_size = 4; // The kernel size
+  repeated uint32 stride = 6; // The stride; defaults to 1
+  // Factor used to dilate the kernel, (implicitly) zero-filling the resulting
+  // holes. (Kernel dilation is sometimes referred to by its use in the
+  // algorithme à trous from Holschneider et al. 1987.)
+  repeated uint32 dilation = 18; // The dilation; defaults to 1
+
+  // For 2D convolution only, the *_h and *_w versions may also be used to
+  // specify both spatial dimensions.
+  optional uint32 pad_h = 9 [default = 0]; // The padding height (2D only)
+  optional uint32 pad_w = 10 [default = 0]; // The padding width (2D only)
+  optional uint32 kernel_h = 11; // The kernel height (2D only)
+  optional uint32 kernel_w = 12; // The kernel width (2D only)
+  optional uint32 stride_h = 13; // The stride height (2D only)
+  optional uint32 stride_w = 14; // The stride width (2D only)
+
+  optional uint32 group = 5 [default = 1]; // The group size for group conv
+
+  optional FillerParameter weight_filler = 7; // The filler for the weight
+  optional FillerParameter bias_filler = 8; // The filler for the bias
+  enum Engine {
+    DEFAULT = 0;
+    CAFFE = 1;
+    CUDNN = 2;
+  }
+  optional Engine engine = 15 [default = DEFAULT];
+
+  // The axis to interpret as "channels" when performing convolution.
+  // Preceding dimensions are treated as independent inputs;
+  // succeeding dimensions are treated as "spatial".
+  // With (N, C, H, W) inputs, and axis == 1 (the default), we perform
+  // N independent 2D convolutions, sliding C-channel (or (C/g)-channels, for
+  // groups g>1) filters across the spatial axes (H, W) of the input.
+  // With (N, C, D, H, W) inputs, and axis == 1, we perform
+  // N independent 3D convolutions, sliding (C/g)-channels
+  // filters across the spatial axes (D, H, W) of the input.
+  optional int32 axis = 16 [default = 1];
+
+  // Whether to force use of the general ND convolution, even if a specific
+  // implementation for blobs of the appropriate number of spatial dimensions
+  // is available. (Currently, there is only a 2D-specific convolution
+  // implementation; for input blobs with num_axes != 2, this option is
+  // ignored and the ND implementation will be used.)
+  optional bool force_nd_im2col = 17 [default = false];
+  optional bool td = 19 [default = false];
+}
+
+message ConvolutionTDParameter {
   optional uint32 num_output = 1; // The number of outputs for the layer
   optional bool bias_term = 2 [default = true]; // whether to have bias terms
 
@@ -812,12 +885,41 @@ message ImageDataParameter {
   optional string root_folder = 12 [default = ""];
 }
 
+message SelectSegBinaryParameter{
+  optional uint32 cls_label_base = 1 [default = 0];
+  enum LabelType {
+    NONE = 0;
+    IMAGE = 1;
+    PIXEL = 2;
+  }
+  optional LabelType label_type = 2 [default = IMAGE];
+  optional uint32 label_dim = 3 [default = 1];
+  optional int32 ignore_label = 4 [default = 255];
+}
+
 message InfogainLossParameter {
   // Specify the infogain matrix source.
   optional string source = 1;
 }
 
 message InnerProductParameter {
+  optional uint32 num_output = 1; // The number of outputs for the layer
+  optional bool bias_term = 2 [default = true]; // whether to have bias terms
+  optional FillerParameter weight_filler = 3; // The filler for the weight
+  optional FillerParameter bias_filler = 4; // The filler for the bias
+
+  // The first axis to be lumped into a single inner product computation;
+  // all preceding axes are retained in the output.
+  // May be negative to index from the end (e.g., -1 for the last axis).
+  optional int32 axis = 5 [default = 1];
+  // Specify whether to transpose the weight matrix or not.
+  // If transpose == true, any operations will be performed on the transpose
+  // of the weight matrix. The weight matrix itself is not going to be transposed
+  // but rather the transfer flag of operations will be toggled accordingly.
+  optional bool transpose = 6 [default = false];
+}
+
+message InnerProductTDParameter {
   optional uint32 num_output = 1; // The number of outputs for the layer
   optional bool bias_term = 2 [default = true]; // whether to have bias terms
   optional FillerParameter weight_filler = 3; // The filler for the weight
@@ -920,6 +1022,119 @@ message PoolingParameter {
   // If global_pooling then it will pool over the size of the bottom by doing
   // kernel_h = bottom->height and kernel_w = bottom->width
   optional bool global_pooling = 12 [default = false];
+  optional bool ceil_mode = 13 [default = true];
+}
+
+message SuperpixelPoolingParameter {
+  enum PoolMethod {
+    MAX = 0;
+    AVE = 1;
+    STOCHASTIC = 2;
+  }
+  optional PoolMethod pool = 1 [default = AVE]; // The pooling method
+
+  // scale, shift, rf (receptive field) are used to map activations in a feature map
+  // back to pixels in the raw image.
+  // assume (i, j) is a coordinate of the activation in the feature map, then
+  // the coordiante (ri, rj) of the center to the corresponding region in the rew image is
+  // ri = (i-1)*scale + shift, rj = (j-1)*scale + shift, and the region size is rf.
+  optional float scale = 2;
+  optional float shift = 3;
+//  optional uint32 rf = 4;
+  // sp_label represent which superpixel will be poolled,
+  // sp=-1 means that all superpixels will be poolled and then
+  // take mean value.
+  optional int32 sp_label = 5 [default = -1];
+  // Pad, kernel size, and stride are all given as a single value for equal
+  // dimensions in height and width or as Y, X pairs.
+//  optional uint32 pad = 4 [default = 0]; // The padding size (equal in Y, X)
+//  optional uint32 pad_h = 9 [default = 0]; // The padding height
+//  optional uint32 pad_w = 10 [default = 0]; // The padding width
+//  optional uint32 kernel_size = 2; // The kernel size (square)
+//  optional uint32 kernel_h = 5; // The kernel height
+//  optional uint32 kernel_w = 6; // The kernel width
+//  optional uint32 stride = 3 [default = 1]; // The stride (equal in Y, X)
+//  optional uint32 stride_h = 7; // The stride height
+//  optional uint32 stride_w = 8; // The stride width
+  enum Engine {
+    DEFAULT = 0;
+    CAFFE = 1;
+    CUDNN = 2;
+  }
+  optional Engine engine = 11 [default = DEFAULT];
+  // If global_pooling then it will pool over the size of the bottom by doing
+  // kernel_h = bottom->height and kernel_w = bottom->width
+//  optional bool global_pooling = 12 [default = false];
+}
+
+message SuperpixelPooling1Parameter {
+  enum PoolMethod {
+    MAX = 0;
+    AVE = 1;
+    STOCHASTIC = 2;
+  }
+  optional PoolMethod pool = 1 [default = AVE]; // The pooling method
+
+  // scale, shift, rf (receptive field) are used to map activations in a feature map
+  // back to pixels in the raw image.
+  // assume (i, j) is a coordinate of the activation in the feature map, then
+  // the coordiante (ri, rj) of the center to the corresponding region in the rew image is
+  // ri = (i-1)*scale + shift, rj = (j-1)*scale + shift, and the region size is rf.
+  optional float scale = 2;
+  optional float shift = 3;
+//  optional uint32 rf = 4;
+  // sp_label represent which superpixel will be poolled,
+  // sp=-1 means that all superpixels will be poolled and then
+  // take mean value.
+  optional int32 sp_label = 5 [default = -1];
+  // Pad, kernel size, and stride are all given as a single value for equal
+  // dimensions in height and width or as Y, X pairs.
+//  optional uint32 pad = 4 [default = 0]; // The padding size (equal in Y, X)
+//  optional uint32 pad_h = 9 [default = 0]; // The padding height
+//  optional uint32 pad_w = 10 [default = 0]; // The padding width
+//  optional uint32 kernel_size = 2; // The kernel size (square)
+//  optional uint32 kernel_h = 5; // The kernel height
+//  optional uint32 kernel_w = 6; // The kernel width
+//  optional uint32 stride = 3 [default = 1]; // The stride (equal in Y, X)
+//  optional uint32 stride_h = 7; // The stride height
+//  optional uint32 stride_w = 8; // The stride width
+  enum Engine {
+    DEFAULT = 0;
+    CAFFE = 1;
+    CUDNN = 2;
+  }
+  optional Engine engine = 11 [default = DEFAULT];
+  // If global_pooling then it will pool over the size of the bottom by doing
+  // kernel_h = bottom->height and kernel_w = bottom->width
+//  optional bool global_pooling = 12 [default = false];
+}
+
+message UnpoolingParameter {
+  enum UnpoolMethod {
+    MAX = 0;
+    AVE = 1;
+    TILE= 2;
+  }
+  optional UnpoolMethod unpool = 1 [default = MAX]; // The pooling method
+  // Pad, kernel size, and stride are all given as a single value for equal
+  // dimensions in height and width or as Y, X pairs.
+  optional uint32 pad = 4 [default = 0]; // The padding size (equal in Y, X)
+  optional uint32 pad_h = 9 [default = 0]; // The padding height
+  optional uint32 pad_w = 10 [default = 0]; // The padding width
+  optional uint32 kernel_size = 2; // The kernel size (square)
+  optional uint32 kernel_h = 5; // The kernel height
+  optional uint32 kernel_w = 6; // The kernel width
+  optional uint32 stride = 3 [default = 1]; // The stride (equal in Y, X)
+  optional uint32 stride_h = 7; // The stride height
+  optional uint32 stride_w = 8; // The stride width
+  optional uint32 unpool_size = 12; // destined unpooled map size
+  optional uint32 unpool_h = 13; // destined unpooled map height
+  optional uint32 unpool_w = 14; // destined unpooled map width
+  enum Engine {
+    DEFAULT = 0;
+    CAFFE = 1;
+  }
+  optional Engine engine = 11 [default = DEFAULT];
 }
 
 message PowerParameter {
@@ -993,6 +1208,21 @@ message ReductionParameter {
 
 // Message that stores parameters used by ReLULayer
 message ReLUParameter {
+  // Allow non-zero slope for negative inputs to speed up optimization
+  // Described in:
+  // Maas, A. L., Hannun, A. Y., & Ng, A. Y. (2013). Rectifier nonlinearities
+  // improve neural network acoustic models. In ICML Workshop on Deep Learning
+  // for Audio, Speech, and Language Processing.
+  optional float negative_slope = 1 [default = 0];
+  enum Engine {
+    DEFAULT = 0;
+    CAFFE = 1;
+    CUDNN = 2;
+  }
+  optional Engine engine = 2 [default = DEFAULT];
+}
+
+message ReLUMaskParameter {
   // Allow non-zero slope for negative inputs to speed up optimization
   // Described in:
   // Maas, A. L., Hannun, A. Y., & Ng, A. Y. (2013). Rectifier nonlinearities
@@ -1141,6 +1371,9 @@ message SoftmaxParameter {
   // from the end (e.g., -1 for the last axis).
   // Any other axes will be evaluated as independent softmaxes.
   optional int32 axis = 2 [default = 1];
+
+  repeated int32 label_id = 3;
+  repeated float label_scale = 4;
 }
 
 message TanHParameter {
@@ -1244,6 +1477,7 @@ message V1LayerParameter {
     HINGE_LOSS = 28;
     IM2COL = 11;
     IMAGE_DATA = 12;
+    SELECTSEGBINARY = 51;
     INFOGAIN_LOSS = 13;
     INNER_PRODUCT = 14;
     LRN = 15;
@@ -1251,6 +1485,7 @@ message V1LayerParameter {
     MULTINOMIAL_LOGISTIC_LOSS = 16;
     MVN = 34;
     POOLING = 17;
+    SUPERPIXELPOOLING=50;
     POWER = 26;
     RELU = 18;
     SIGMOID = 19;
@@ -1289,14 +1524,19 @@ message V1LayerParameter {
   optional HDF5OutputParameter hdf5_output_param = 14;
   optional HingeLossParameter hinge_loss_param = 29;
   optional ImageDataParameter image_data_param = 15;
+  optional SelectSegBinaryParameter select_seg_binary_param = 54;
   optional InfogainLossParameter infogain_loss_param = 16;
   optional InnerProductParameter inner_product_param = 17;
   optional LRNParameter lrn_param = 18;
   optional MemoryDataParameter memory_data_param = 22;
   optional MVNParameter mvn_param = 34;
   optional PoolingParameter pooling_param = 19;
+  optional SuperpixelPoolingParameter superpixel_pooling_param = 50;
+  optional SuperpixelPooling1Parameter superpixel_pooling1_param = 52;
+  optional UnpoolingParameter unpooling_param = 51;
   optional PowerParameter power_param = 21;
   optional ReLUParameter relu_param = 30;
+  optional ReLUMaskParameter relu_mask_param = 53;
   optional SigmoidParameter sigmoid_param = 38;
   optional SoftmaxParameter softmax_param = 39;
   optional SliceParameter slice_param = 31;

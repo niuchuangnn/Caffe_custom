@@ -20,7 +20,7 @@ if(HAVE_CUDA)
   list(APPEND srcs ${cuda_objs} ${cuda})
 endif()
 
-add_library(caffe ${srcs})
+add_library(caffe ${srcs} layers/weightedSoftmax_loss_layer.cpp layers/pooling_switches_layer.cpp layers/slice_half_layer.cpp layers/inv_pooling_layer.cpp layers/superpixel_pooling_layer.cpp layers/unpooling_layer.cpp layers/superpixel_pooling1_layer.cpp layers/relu_mask_layer.cpp layers/relu_mask_layer.cu layers/select_seg_binary_layer.cpp layers/image_dim_prefetching_layer.cpp layers/image_dim_prefetching_layer.cu layers/bn_layer.cpp layers/bn_layer.cu layers/conv_td_layer.cpp layers/inner_product_td_layer.cpp layers/pooling_td_layer.cpp layers/eltwise_td_layer.cpp layers/inner_product_td_layer.cu layers/pooling_td_layer.cu layers/eltwise_td_layer.cu layers/conv_td_layer.cu)
 caffe_default_properties(caffe)
 target_link_libraries(caffe ${Caffe_LINKER_LIBS})
 target_include_directories(caffe ${Caffe_INCLUDE_DIRS}

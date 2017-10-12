@@ -161,8 +161,14 @@ layer {
 }
 layer {
   name: "loss"
-  type: "SoftmaxWithLoss"
+  type: "WeightedSoftmaxWithLoss"
   bottom: "ip2"
   bottom: "label"
   top: "loss"
+  softmax_param{
+    label_id: 1
+    label_id: 2
+    label_scale: 0.8
+    label_scale: 1.2
+  }
 }
